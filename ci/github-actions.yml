@@ -1,0 +1,17 @@
+name: memory-budget
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 用示例库跑一遍闸门
+        run: python memory-budget.py --home examples

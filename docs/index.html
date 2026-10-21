@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分层记忆架构 · L0–L3</title>
+<meta name="description" content="一套可复制的 agent 记忆分层约定：L0 常驻规则 / L1 索引 / L2 主题记忆 / L3 冷档，含预算、命名规则与校验脚本。">
+<style>
+:root{
+  --paper:#0b1520; --panel:#0f1e2b; --panel2:#122435; --line:#1d394f; --line2:#16293a;
+  --text:#dbe7f1; --muted:#7f98ad; --dim:#5d7488;
+  --l0:#e8edf2; --l1:#2fc7d8; --l2:#e85d9b; --l3:#8fd49a; --gate:#e9c46a;
+  --focus:#7fe3ff;
+  --display:"Bahnschrift SemiCondensed","Bahnschrift","Segoe UI","Microsoft YaHei UI",sans-serif;
+  --body:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  --mono:"Cascadia Mono","Consolas","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--text);font:14px/1.62 var(--body);-webkit-font-smoothing:antialiased}
+body{background-image:linear-gradient(to right,rgba(122,176,210,.045) 1px,transparent 1px),linear-gradient(to bottom,rgba(122,176,210,.045) 1px,transparent 1px);background-size:32px 32px;background-position:-1px -1px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+code,pre{font-family:var(--mono)}
+a{color:var(--focus)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* header */
+.masthead{position:sticky;top:0;z-index:30;background:rgba(11,21,32,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 30px 0}
+.row1{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.mark{font-family:var(--display);font-size:22px;line-height:1;color:#fff;border:1px solid var(--line);padding:5px 9px;letter-spacing:.02em}
+h1{margin:0;font-family:var(--display);font-weight:600;font-size:28px;line-height:1;color:#f2f7fb}
+.sub{font-size:12px;color:var(--muted)}
+.facts{display:flex;gap:0;margin:0 0 0 auto}
+.facts div{padding:0 15px;border-left:1px solid var(--line2)}
+.facts div:first-child{border-left:0;padding-left:0}
+.facts b{display:block;font-family:var(--display);font-size:20px;line-height:1.1;color:var(--shell,#e8edf2);font-variant-numeric:tabular-nums}
+.facts span{font-size:11px;color:var(--muted)}
+.jump{display:flex;gap:2px;margin-top:11px;overflow-x:auto}
+.jump a{padding:9px 14px 10px;color:var(--muted);font-size:13px;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}
+.jump a:hover{color:#fff}
+.jump a.on{color:#fff;border-bottom-color:var(--l1)}
+
+main{padding:22px 30px 80px;max-width:1240px;margin:0 auto}
+section{margin-bottom:34px;scroll-margin-top:132px}
+h2{margin:0 0 6px;font-family:var(--display);font-size:21px;font-weight:600;color:#eef5fa;letter-spacing:.01em}
+.lede{margin:0 0 16px;max-width:78ch;color:#a9bfd0;font-size:13.5px}
+.lede b{color:#e6f0f8}
+.lede code{font-size:12.5px;color:var(--l1)}
+
+/* diagram */
+.frame{border:1px solid var(--line);background:rgba(9,19,29,.55);padding:8px 10px 4px;position:relative}
+.frame::before,.frame::after{content:"";position:absolute;width:9px;height:9px;border:1px solid rgba(122,176,210,.45)}
+.frame::before{left:4px;top:4px;border-right:0;border-bottom:0}
+.frame::after{right:4px;bottom:4px;border-left:0;border-top:0}
+svg.map{display:block;width:100%;height:auto}
+svg.map text{font-family:var(--body)}
+svg.map .mono{font-family:var(--mono)}
+svg.map .lay{fill:rgba(18,36,53,.92);stroke:#27506e}
+svg.map .code{font-family:var(--display);font-size:24px;fill:#fff}
+svg.map .title{font-size:14px;fill:#eef5fa}
+svg.map .path{font-family:var(--mono);font-size:11px;fill:#9fb6c7}
+svg.map .budget{font-family:var(--mono);font-size:11px;fill:#cfe0ec}
+svg.map .trig{font-size:12.5px;fill:#dbe7f1}
+svg.map .cost{font-family:var(--mono);font-size:11px;fill:#7f98ad}
+svg.map .arrow{stroke:#3f6d8c;stroke-width:1.4;fill:none}
+svg.map .arrow.hot{stroke:#2fc7d8}
+svg.map .lbl{font-size:10.5px;fill:#7f98ad}
+svg.map .gate{fill:rgba(233,196,106,.07);stroke:rgba(233,196,106,.45)}
+svg.map .gtext{font-size:12.5px;fill:#e7cd8f}
+
+/* panels & tables */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{border:1px solid var(--line);background:rgba(15,30,43,.6);padding:15px 17px}
+.card h3{margin:0 0 4px;font-family:var(--display);font-size:15.5px;font-weight:600;color:#eef5fa}
+.card p{margin:0;font-size:12.5px;color:var(--muted)}
+.card p+p{margin-top:8px}
+.card .big{font-family:var(--display);font-size:26px;color:#fff;line-height:1.1}
+.card .tag{display:inline-block;font-size:11px;padding:0 5px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:2px}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:11.5px}
+td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:#e6f0f8}
+td.mono{font-family:var(--mono);font-size:11.5px;color:#cfe0ec}
+
+.bars{display:grid;gap:7px;margin-top:12px}
+.barrow{display:grid;grid-template-columns:120px 1fr 96px;gap:10px;align-items:center;font-size:12px}
+.bartrack{height:9px;background:#132535;position:relative}
+.bartrack i{display:block;height:100%}
+.barlabel{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right}
+
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+ol.steps li{position:relative;padding:9px 0 9px 42px;border-top:1px solid var(--line2);font-size:12.5px}
+ol.steps li:first-child{border-top:0}
+ol.steps li::before{counter-increment:s;content:counter(s,decimal-leading-zero);position:absolute;left:0;top:11px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+ol.steps b{color:#eef5fa;font-weight:600}
+ol.steps code{font-size:11.5px;color:var(--l1)}
+
+/* copy blocks */
+.block{border:1px solid var(--line);background:rgba(15,30,43,.55);margin-bottom:14px}
+.blockhead{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line2);background:rgba(18,36,53,.6)}
+.blockhead h3{margin:0;font-family:var(--display);font-size:14px;font-weight:600;color:#eef5fa}
+.blockhead .note{font-size:11.5px;color:var(--dim)}
+.copy{margin-left:auto;font-size:11.5px;padding:3px 10px;border:1px solid var(--line);color:#b8cbd9;transition:border-color .15s,color .15s}
+.copy:hover{border-color:var(--l1);color:#fff}
+.copy.done{border-color:var(--l3);color:var(--l3)}
+pre{margin:0;padding:12px 14px;overflow:auto;font-size:11.8px;line-height:1.62;color:#cfe0ec;background:rgba(8,16,24,.55);max-height:520px}
+pre::-webkit-scrollbar{width:10px;height:10px}
+pre::-webkit-scrollbar-thumb{background:#1d394f}
+
+/* rules */
+.rules{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.rule{border-left:2px solid var(--l2);padding:2px 0 2px 12px}
+.rule h4{margin:0 0 3px;font-size:13px;color:#eef5fa;font-weight:600}
+.rule p{margin:0;font-size:12px;color:var(--muted)}
+.rule code{font-size:11.5px;color:#cfe0ec}
+
+.note-box{border:1px dashed var(--line);padding:12px 14px;font-size:12.5px;color:var(--muted)}
+.note-box b{color:#e6f0f8}
+
+.foot{border-top:1px solid var(--line);margin-top:8px;padding-top:14px;font-size:11.5px;color:var(--dim)}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,18px);background:#122435;border:1px solid var(--l1);color:#eaf6ff;font-size:12.5px;padding:7px 14px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:50}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:900px){
+  .masthead{padding:12px 14px 0}
+  main{padding:16px 14px 60px}
+  .facts{margin-left:0}
+  .barrow{grid-template-columns:92px 1fr 78px}
+}
+@media print{
+  body{background:#fff;color:#111}
+  .masthead{position:static;background:#fff;border-color:#bbb}
+  h1,.card .big,.facts b{color:#111}
+  .jump,.copy{display:none}
+  .frame,.card,.block,pre{background:#fff;border-color:#bbb;color:#111}
+  pre{color:#111}
+  section{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="row1">
+    <span class="mark">L0–L3</span>
+    <div>
+      <h1>分层记忆架构</h1>
+      <div class="sub">给 agent 的一套文件约定：每轮只读 1.6k token，需要时才翻全库</div>
+    </div>
+    <div class="facts">
+      <div><b>4</b><span>层</span></div>
+      <div><b>6</b><span>条规则</span></div>
+      <div><b>4</b><span>条禁令</span></div>
+      <div><b>5</b><span>份可复制件</span></div>
+    </div>
+  </div>
+  <nav class="jump">
+    <a href="#map" class="on">结构图</a>
+    <a href="#cost">为什么分层</a>
+    <a href="#rules">规则</a>
+    <a href="#copy">可复制件</a>
+    <a href="#steps">落地顺序</a>
+    <a href="#limits">适用边界</a>
+  </nav>
+</header>
+
+<main>
+
+<section id="map">
+  <h2>四层怎么分工</h2>
+  <p class="lede">
+    不是四种存储，是<b>四种读取时机</b>。越靠上越常读、越贵，所以只允许放「路由键」；越靠下越少读、越便宜，所以允许放「全部细节」。
+    判断一条信息该放哪层，只看一个问题：<b>下一次执行任务时，它必须不必须在场？</b>
+  </p>
+
+  <div class="frame">
+  <svg class="map" viewBox="0 0 1160 620" role="img" aria-label="L0 到 L3 四层记忆结构图">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3f6d8c"/>
+      </marker>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#2fc7d8"/>
+      </marker>
+      <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#e9c46a"/>
+      </marker>
+    </defs>
+
+    <!-- left axis -->
+    <text class="lbl" x="18" y="300" transform="rotate(-90 18 300)" text-anchor="middle">读得越往下 → 发生得越少</text>
+    <path class="arrow" d="M46 120 L46 500" marker-end="url(#a)"/>
+
+    <!-- L0 -->
+    <rect class="lay" x="110" y="54" width="590" height="96" rx="2"/>
+    <rect x="110" y="54" width="6" height="96" fill="#e8edf2"/>
+    <text class="code" x="132" y="94">L0</text>
+    <text class="title" x="196" y="88">常驻规则</text>
+    <text class="path" x="196" y="110">AGENTS.md</text>
+    <text class="budget" x="196" y="132">≤ 2.6 KB · 只放不可违反的规则 + 指针</text>
+
+    <!-- L1 -->
+    <rect class="lay" x="110" y="178" width="590" height="96" rx="2"/>
+    <rect x="110" y="178" width="6" height="96" fill="#2fc7d8"/>
+    <text class="code" x="132" y="218">L1</text>
+    <text class="title" x="196" y="212">索引</text>
+    <text class="path" x="196" y="234">memory/MEMORY.md</text>
+    <text class="budget" x="196" y="256">≤ 15 KB · 每行 ≤ 200 字，只放路由键</text>
+
+    <!-- L2 -->
+    <rect class="lay" x="110" y="302" width="590" height="96" rx="2"/>
+    <rect x="110" y="302" width="6" height="96" fill="#e85d9b"/>
+    <text class="code" x="132" y="342">L2</text>
+    <text class="title" x="196" y="336">主题记忆</text>
+    <text class="path" x="196" y="358">memory/（标签）名字.md</text>
+    <text class="budget" x="196" y="380">≤ 4k token / 篇 · 一篇一个主题</text>
+
+    <!-- L3 -->
+    <rect class="lay" x="110" y="426" width="590" height="96" rx="2"/>
+    <rect x="110" y="426" width="6" height="96" fill="#8fd49a"/>
+    <text class="code" x="132" y="466">L3</text>
+    <text class="title" x="196" y="460">冷档</text>
+    <text class="path" x="196" y="482">memory/（标签）xxx-detail/</text>
+    <text class="budget" x="196" y="504">不限 · 正文都在这里，主文件只留结论</text>
+
+    <!-- arrows between layers -->
+    <path class="arrow hot" d="M405 150 L405 178" marker-end="url(#ah)"/>
+    <text class="lbl" x="415" y="170">只给指针</text>
+    <path class="arrow hot" d="M405 274 L405 302" marker-end="url(#ah)"/>
+    <text class="lbl" x="415" y="294">命中关键词</text>
+    <path class="arrow hot" d="M405 398 L405 426" marker-end="url(#ah)"/>
+    <text class="lbl" x="415" y="418">要细节 / 沿革</text>
+    <path class="arrow" d="M110 474 L88 474 L88 350 L110 350" marker-end="url(#a)"/>
+    <text class="lbl" x="60" y="416">回指</text>
+
+    <!-- right column: trigger / cost -->
+    <text class="trig" x="740" y="84">每轮自动注入</text>
+    <text class="cost" x="740" y="106">≈ 0.5k tok · 最贵的地方</text>
+    <text class="cost" x="740" y="126">任何一句废话都在每轮计费</text>
+
+    <text class="trig" x="740" y="208">会话开场读一次</text>
+    <text class="cost" x="740" y="230">≈ 1.2k tok · 只放「去哪找」</text>
+    <text class="cost" x="740" y="250">细节写进这里 = 每会话都付一次</text>
+
+    <text class="trig" x="740" y="332">命中才读</text>
+    <text class="cost" x="740" y="354">按篇计费 · 平均 1–2 篇/任务</text>
+    <text class="cost" x="740" y="374">超 4k 就拆 L3，别硬塞</text>
+
+    <text class="trig" x="740" y="456">几乎不读</text>
+    <text class="cost" x="740" y="478">只在追查历史/踩坑时翻</text>
+    <text class="cost" x="740" y="498">不校验预算，但要能被索引找到</text>
+
+    <!-- gate -->
+    <rect class="gate" x="110" y="548" width="1020" height="56" rx="2"/>
+    <text class="gtext" x="128" y="572">闸门 memory-budget.py：L0/L1 超预算 · 索引漏登 · 死链 · L2 超限无摘要 → 一律不过</text>
+    <text class="cost" x="128" y="592">闸门只做四件事：量体积、查登记、查链接、查摘要；改完索引再跑一次，规则越少越有人真跑。</text>
+  </svg>
+  </div>
+
+  <p class="lede" style="margin-top:12px">
+    关键不在层数，在「<b>上行只留指针，下行只放正文</b>」。一旦有人把细节写进 L0/L1，整个成本模型就崩了——
+    而这几乎总是从「就加一行，应该没关系」开始的。
+  </p>
+</section>
+
+<section id="cost">
+  <h2>为什么值得分四层</h2>
+  <p class="lede">
+    成本模型很简单：<b>每轮注入的内容 × 轮数</b>。一个 90k token 的记忆库如果每轮全塞，一天几十轮就是几百万 token；
+    分成四层后，每轮只付 L0+L1 的固定开销，L2/L3 只在真的用到时才读。
+  </p>
+
+  <div class="grid g3">
+    <div class="card">
+      <div class="big">≈ 1.6k</div>
+      <p>每轮固定开销（L0 + L1）<span class="tag">要盯的数</span></p>
+      <p>这两个文件每轮/每会话都要重发，所以它们是唯一值得反复瘦身的地方。</p>
+    </div>
+    <div class="card">
+      <div class="big">≈ 86k</div>
+      <p>全库文本（L2 + L3）<span class="tag">不用盯</span></p>
+      <p>总量涨十倍也不影响每轮成本——只要 L2 没被塞进 L1，L3 没被塞进 L2。</p>
+    </div>
+    <div class="card">
+      <div class="big">≈ 2%</div>
+      <p>每轮成本 / 全库体积</p>
+      <p>这就是分层的全部收益：把「全库」换成「索引 + 命中页」。</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>各层体积的量级（对数刻度）</h3>
+    <div class="bars">
+      <div class="barrow"><span>L0 规则</span><span class="bartrack"><i style="width:22%;background:var(--l0)"></i></span><span class="barlabel">2.3 KB</span></div>
+      <div class="barrow"><span>L1 索引</span><span class="bartrack"><i style="width:33%;background:var(--l1)"></i></span><span class="barlabel">5.3 KB</span></div>
+      <div class="barrow"><span>L2 主题</span><span class="bartrack"><i style="width:86%;background:var(--l2)"></i></span><span class="barlabel">396 KB</span></div>
+      <div class="barrow"><span>L3 冷档</span><span class="bartrack"><i style="width:92%;background:var(--l3)"></i></span><span class="barlabel">469 KB</span></div>
+    </div>
+    <p style="margin-top:10px">条宽按 log(体积) 画，否则前两层会看不见。数字是一份 50 条左右记忆库的量级，用来标定你自己的预算。</p>
+  </div>
+</section>
+
+<section id="rules">
+  <h2>让这套结构不塌的六条规则</h2>
+  <p class="lede">预算只是结果，规则才是原因。下面每一条都对应一个真实踩过的坑。</p>
+
+  <div class="rules">
+    <div class="rule">
+      <h4>1 · 分类前置命名</h4>
+      <p><code>（标签）名字.md</code>，文件名与 frontmatter 的 <code>name</code> 同形。冷档目录同样前置：<code>（技术）xxx-detail/</code>。目录名决定排序与扫读速度，比标签系统可靠。</p>
+    </div>
+    <div class="rule">
+      <h4>2 · 索引只放路由键</h4>
+      <p>一行 = 「标题 + 链接 + ≤ 60 字提示」。写细节就是给未来的自己加税——那条细节会被每会话读一次，而正文在 L2 里本来就是懒加载的。</p>
+    </div>
+    <div class="rule">
+      <h4>3 · L0 只放规则和指针</h4>
+      <p>环境清单、目录结构、技能统计这类「资料」一律进 L2。L0 每轮计费，多一段就多付一辈子。</p>
+    </div>
+    <div class="rule">
+      <h4>4 · 超预算先加头部摘要</h4>
+      <p>L2 超过 4k token 或 200 行，就在前 45 行内补 <code>## 当前状态（先读这里）</code>：当前状态、该跳读哪几节、最新变化在哪。用 <code>read limit=45</code> 就能干活。</p>
+    </div>
+    <div class="rule">
+      <h4>5 · 拆冷档而不是删正文</h4>
+      <p>沿革、勘误、复现细节搬进 <code>*-detail/</code>，主文件只留结论 + 一行指针。删掉的信息三个月后一定有人来问。</p>
+    </div>
+    <div class="rule">
+      <h4>6 · 改名要全库扫链接</h4>
+      <p>改 frontmatter 的 <code>name</code> 会让按裸名寻址的 <code>[[wikilink]]</code> 全部失效。改名前后各跑一次闸门，并先整包备份。</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card">
+      <h3>四条禁令</h3>
+      <ol class="steps">
+        <li><b>禁止把细节写进索引</b> · 索引行只是路由键</li>
+        <li><b>禁止把资料写进常驻规则</b> · 环境/路径/清单都进 L2</li>
+        <li><b>禁止把详情堆回速查表</b> · 正文进冷档，主表留一行</li>
+        <li><b>禁止为同一主题再开新文件</b> · 先合并，再新建</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>子架构：领域大了怎么办</h3>
+      <p>某个领域（比如某个长期项目）记忆变多时，在它下面再套一层，但<b>预算层级不变</b>：</p>
+      <table style="margin-top:8px">
+        <tr><th>子层</th><th>落点</th><th>在总架构里算</th></tr>
+        <tr><td class="mono">子 L1</td><td class="mono">该领域总索引</td><td>总 L2</td></tr>
+        <tr><td class="mono">子 L2</td><td class="mono">领域内各主题</td><td>总 L2</td></tr>
+        <tr><td class="mono">子 L3</td><td class="mono">（标签）xxx-detail/</td><td>总 L3</td></tr>
+      </table>
+      <p style="margin-top:8px">注意：子 L2 也必须在总索引里占一行，否则闸门会判「登记缺失」。</p>
+    </div>
+  </div>
+</section>
+
+<section id="copy">
+  <h2>可复制件</h2>
+  <p class="lede">五块东西：目录树、两段骨架、一个能跑的校验脚本、一份 Mermaid 源码。按钮复制的是纯文本，直接粘进编辑器即可。</p>
+
+  <div class="block">
+    <div class="blockhead">
+      <h3>① 目录树</h3><span class="note">最小可用结构</span>
+      <button class="copy" data-target="tree">复制</button>
+    </div>
+    <pre id="tree">~/.agent-home/                # 或任意 agent 的 home
+├── AGENTS.md                 # L0 常驻规则（每轮注入，≤2.6 KB）
+└── memory/
+    ├── MEMORY.md             # L1 索引（每会话一次，≤15 KB）
+    ├── （环境）runtime.md      # L2 主题记忆（命中才读，≤4k tok）
+    ├── （技术）build-issues.md
+    ├── （项目）alpha.md
+    ├── （规则）review.md
+    ├── （技术）build-issues-detail/   # L3 冷档（不限）
+    │   ├── 2026-01-04-timeout.md
+    │   └── 2026-02-11-race.md
+    └── （环境）runtime-inventory.md   # 顶层冷档文件（不计 L2 预算）
+</pre>
+  </div>
+
+  <div class="block">
+    <div class="blockhead">
+      <h3>② AGENTS.md 骨架</h3><span class="note">L0：只放规则和指针，控制在 2.6 KB 内</span>
+      <button class="copy" data-target="agents">复制</button>
+    </div>
+    <pre id="agents"># 常驻规则（L0）
+
+## 硬规则（不可违反）
+- 动手前先查记忆索引；命中就读对应主题记忆，不要凭印象。
+- 同一件事失败 2 次必须上报，不自行绕过。
+- 新建记忆条目 / 新目录前先说清「为什么建、放哪、叫什么」，得到确认再写。
+- 任何删除、覆盖、跨目录移动，先确认目标路径。
+
+## 去哪查（本文件只留指针）
+- 环境 / 依赖 / 路径 → memory/（环境）runtime.md
+- 报错与踩坑 → memory/（技术）build-issues.md
+- 项目进度 → memory/（项目）alpha.md
+- 记忆库自身的规矩 → memory/（规则）memory.md
+
+## 开场动作
+1. 读 memory/MEMORY.md（≤15 KB 的索引）。
+2. 任务涉及哪个关键词，再读对应的那一篇，不要全库通读。
+3. 收尾跑 python memory-budget.py，必须 [OK]。
+</pre>
+  </div>
+
+  <div class="block">
+    <div class="blockhead">
+      <h3>③ MEMORY.md 骨架</h3><span class="note">L1：一行一个路由键</span>
+      <button class="copy" data-target="index">复制</button>
+    </div>
+    <pre id="index"># 记忆索引（只放路由键，细节在对应文件里）
+
+## 行动优先（动手前必读）
+- [运行环境](（环境）runtime.md) — 解释器 / 依赖 / 路径速查
+- [常见问题](（技术）build-issues.md) — 报错先查表，命中读详情
+- [记忆规矩](（规则）memory.md) — 四层分级与预算
+
+## 项目
+- [Alpha 服务](（项目）alpha.md) — 进度 / 口径 / 待办
+
+## 知识与工具
+- [构建链路](（技术）build-chain.md) — 脚本化构建与校验
+
+<!-- 规则：一行 = 标题 + 链接 + 60 字内提示；写细节请回 L2 -->
+</pre>
+  </div>
+
+  <div class="block">
+    <div class="blockhead">
+      <h3>④ memory-budget.py</h3><span class="note">闸门：四件事——量体积、查登记、查链接、查摘要</span>
+      <button class="copy" data-target="budget">复制</button>
+    </div>
+    <pre id="budget">#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""分层记忆库预算校验（L0–L3）。
+
+四层的约定：
+  L0  常驻规则   AGENTS.md        每轮随系统提示注入，最贵
+  L1  索引       MEMORY.md        每会话开场读一次，只放路由键
+  L2  主题记忆   memory/*.md      命中才读
+  L3  冷档       memory/*-detail/ 几乎不读，不限预算
+
+检查：
+  1. L0 体积是否超预算
+  2. L1 体积是否超预算、索引行是否过长
+  3. L1 里的每条链接是否指向真实文件
+  4. 每个 L2 文件是否都能从 L1 找到（登记完整性）
+  5. L2 超预算时，是否带「先读这里」头部摘要
+  6. 汇总每轮固定开销（L0 + L1）
+
+用法：
+  python memory-budget.py --home ~/.agent-home
+  python memory-budget.py --home /path/to/home --agents AGENTS.md --memory memory
+退出码 0 = 全部通过，1 = 有违规。
+"""
+import argparse
+import fnmatch
+import os
+import re
+import sys
+
+# 中文 Windows 的控制台常是 GBK：先尝试切到 UTF-8，失败也不影响判定
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+# ── 预算：改这里，或改成从配置文件读 ────────────────────────────────
+L0_BUDGET_BYTES = 2600          # L0 上限
+L1_BUDGET_BYTES = 15360         # L1 上限
+INDEX_LINE_MAX = 200            # 单条索引行的最大字符数
+L2_MAX_TOKENS = 4000            # 单条 L2 的 token 上限
+L2_MAX_LINES = 200              # 单条 L2 的行数上限
+HEADER_SCAN_LINES = 45          # 在前多少行内找头部摘要
+HEADER_MARK = "先读这里"         # 头部摘要的标记
+
+LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def est_tokens(text):
+    """粗估 token：CJK 约 1.6 字/token，其余约 4 字符/token。"""
+    cjk = len(CJK_RE.findall(text))
+    return int(cjk / 1.6 + (len(text) - cjk) / 4)
+
+
+def read(path):
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        return fh.read()
+
+
+def human(nbytes):
+    return f"{nbytes} B" if nbytes &lt; 1024 else f"{nbytes / 1024:.1f} KB"
+
+
+def main():
+    ap = argparse.ArgumentParser(description="校验 L0–L3 分层记忆库")
+    ap.add_argument("--home", default=os.path.expanduser("~/.agent-home"), help="记忆库所在的 home 目录")
+    ap.add_argument("--agents", default="AGENTS.md", help="L0 文件名（相对 home）")
+    ap.add_argument("--memory", default="memory", help="记忆库目录名（相对 home）")
+    ap.add_argument(
+        "--cold",
+        default="*-inventory.md,*-catalog.md",
+        help="放在 memory/ 顶层但按冷档对待的文件（逗号分隔的 glob）",
+    )
+    args = ap.parse_args()
+
+    home = os.path.abspath(os.path.expanduser(args.home))
+    mem = os.path.join(home, args.memory)
+    l0 = os.path.join(home, args.agents)
+    l1 = os.path.join(mem, "MEMORY.md")
+
+    problems = []
+    notes = []
+
+    if not os.path.isdir(mem):
+        print(f"[FAIL] 找不到记忆库目录：{mem}")
+        return 1
+
+    # ── L0 ────────────────────────────────────────────────────────────
+    if not os.path.isfile(l0):
+        problems.append(f"L0 缺失：{l0}")
+        l0_size = 0
+        l0_tok = 0
+    else:
+        text0 = read(l0)
+        l0_size = os.path.getsize(l0)
+        l0_tok = est_tokens(text0)
+        if l0_size &gt; L0_BUDGET_BYTES:
+            problems.append(f"L0 超预算：{human(l0_size)} &gt; {human(L0_BUDGET_BYTES)}")
+        print(f"L0  {human(l0_size):&gt;8}  ~{l0_tok:&gt;5} tok   {os.path.relpath(l0, home)}")
+
+    # ── L1 ────────────────────────────────────────────────────────────
+    if not os.path.isfile(l1):
+        print(f"[FAIL] 找不到索引：{l1}")
+        return 1
+
+    text1 = read(l1)
+    l1_size = os.path.getsize(l1)
+    l1_tok = est_tokens(text1)
+    if l1_size &gt; L1_BUDGET_BYTES:
+        problems.append(f"L1 超预算：{human(l1_size)} &gt; {human(L1_BUDGET_BYTES)}")
+    print(f"L1  {human(l1_size):&gt;8}  ~{l1_tok:&gt;5} tok   {os.path.relpath(l1, home)}")
+
+    links = []
+    long_lines = 0
+    for i, line in enumerate(text1.splitlines(), 1):
+        for target in LINK_RE.findall(line):
+            links.append((i, target))
+        if line.strip().startswith("- [") and len(line) &gt; INDEX_LINE_MAX:
+            long_lines += 1
+            problems.append(f"L1 索引行过长（第 {i} 行，{len(line)} 字 &gt; {INDEX_LINE_MAX}）")
+    if long_lines:
+        notes.append(f"{long_lines} 条索引行超过 {INDEX_LINE_MAX} 字")
+
+    # ── 链接有效性 ────────────────────────────────────────────────────
+    linked_files = set()
+    dead = 0
+    for lineno, target in links:
+        target = target.split("#")[0].strip()
+        if not target or "://" in target:
+            continue
+        path = os.path.normpath(os.path.join(mem, target))
+        if not os.path.exists(path):
+            dead += 1
+            problems.append(f"死链（第 {lineno} 行）：{target}")
+        else:
+            linked_files.add(os.path.basename(path))
+
+    # ── L2 登记完整性 + 单条预算 ──────────────────────────────────────
+    cold_globs = [x.strip() for x in args.cold.split(",") if x.strip()]
+    top_md = [
+        f for f in os.listdir(mem)
+        if f.endswith(".md") and f != "MEMORY.md" and os.path.isfile(os.path.join(mem, f))
+    ]
+    cold_files = [f for f in top_md if any(fnmatch.fnmatch(f, g) for g in cold_globs)]
+    l2_files = sorted(f for f in top_md if f not in cold_files)
+    l2_bytes = 0
+    l2_tok = 0
+    for name in l2_files:
+        path = os.path.join(mem, name)
+        body = read(path)
+        size = os.path.getsize(path)
+        tok = est_tokens(body)
+        l2_bytes += size
+        l2_tok += tok
+        if name not in linked_files:
+            problems.append(f"L2 未在 L1 登记：{name}")
+        over_tok = tok &gt; L2_MAX_TOKENS
+        over_lines = len(body.splitlines()) &gt; L2_MAX_LINES
+        if over_tok or over_lines:
+            head = "\n".join(body.splitlines()[:HEADER_SCAN_LINES])
+            if HEADER_MARK not in head:
+                why = []
+                if over_tok:
+                    why.append(f"~{tok} tok &gt; {L2_MAX_TOKENS}")
+                if over_lines:
+                    why.append(f"{len(body.splitlines())} 行 &gt; {L2_MAX_LINES}")
+                problems.append(f"L2 超预算且缺头部摘要：{name}（{'，'.join(why)}）")
+
+    # ── L3 只统计，不校验预算 ─────────────────────────────────────────
+    l3_dirs = sorted(
+        d for d in os.listdir(mem) if os.path.isdir(os.path.join(mem, d))
+    )
+    l3_files = 0
+    l3_bytes = 0
+    for d in l3_dirs:
+        for root, _dirs, files in os.walk(os.path.join(mem, d)):
+            for f in files:
+                l3_files += 1
+                l3_bytes += os.path.getsize(os.path.join(root, f))
+
+    # ── 汇总 ──────────────────────────────────────────────────────────
+    print(f"L2  {human(l2_bytes):&gt;8}  ~{l2_tok:&gt;5} tok   {len(l2_files)} 个主题记忆")
+    if cold_files:
+        print(f"    （另有 {len(cold_files)} 个顶层冷档文件按约定不计预算：{', '.join(cold_files[:3])}"
+              f"{' …' if len(cold_files) &gt; 3 else ''}）")
+    print(f"L3  {human(l3_bytes):&gt;8}  {'':&gt;7}     {len(l3_dirs)} 个冷档目录 / {l3_files} 个文件（不校验预算）")
+    print("-" * 62)
+    print(f"每轮固定开销 ≈ {l0_tok + l1_tok} tok（L0 {l0_tok} + L1 {l1_tok}）")
+    print(f"全库（L2+L3）≈ {l2_tok} tok 文本 / {human(l2_bytes + l3_bytes)}")
+    if dead:
+        notes.append(f"{dead} 条死链")
+
+    if problems:
+        print()
+        for p in problems:
+            print("[FAIL] " + p)
+        print(f"\n[FAIL] 共 {len(problems)} 项违规")
+        return 1
+
+    print("\n[OK] 全部通过")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+</pre>
+  </div>
+
+  <div class="block">
+    <div class="blockhead">
+      <h3>⑤ Mermaid 源码</h3><span class="note">贴进 README / Wiki / 支持 Mermaid 的编辑器</span>
+      <button class="copy" data-target="mermaid">复制</button>
+    </div>
+    <pre id="mermaid">flowchart TD
+  U["一次请求"] -->|每轮注入| L0["L0 常驻规则<br/>AGENTS.md · ≤2.6KB"]
+  L0 -->|只给指针| L1["L1 索引<br/>MEMORY.md · ≤15KB"]
+  L1 -->|命中关键词| L2["L2 主题记忆<br/>memory/*.md · ≤4k tok/篇"]
+  L2 -->|要细节/沿革| L3["L3 冷档<br/>*-detail/ · 不限"]
+  L3 -.->|回指| L2
+
+  N["新事实"] --> D{"先判归宿"}
+  D -->|每轮都要遵守| L0
+  D -->|需要被检索| L1
+  D -->|独立主题| L2
+  D -->|只是细节| L3
+  L2 --> G["闸门：memory-budget.py"]
+  L1 --> G
+  G -->|不过| R["删细节 / 补摘要 / 拆冷档"]
+  R --> L2
+</pre>
+  </div>
+</section>
+
+<section id="steps">
+  <h2>落地顺序（半天能跑起来）</h2>
+  <p class="lede">别先写满记忆库再分层——从零开始反而快。第 1–4 步做完就有收益，5–7 步是让它半年后还站得住。</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <ol class="steps">
+        <li><b>建两个文件</b> · <code>AGENTS.md</code> + <code>memory/MEMORY.md</code>，先写十行以内。</li>
+        <li><b>定预算</b> · 先抄 2.6 KB / 15 KB / 4k tok / 200 行；跑一周再按自己实际情况调。</li>
+        <li><b>定命名</b> · <code>（标签）名字.md</code>，文件名与 <code>name</code> 同形；标签固定成一小撮，别每天起新的。</li>
+        <li><b>写第一条记忆</b> · 正文进 L2，索引只加一行。写完立刻跑一次闸门。</li>
+      </ol>
+    </div>
+    <div class="card">
+      <ol class="steps" style="counter-reset:s 4">
+        <li><b>接闸门</b> · 放进收工步骤或 CI；<b>不过就不算写完</b>，这条要写进 L0。</li>
+        <li><b>第一次拆分</b> · 某篇超 4k tok 时，正文搬 <code>*-detail/</code>，主文件留结论 + 指针 + 头部摘要。</li>
+        <li><b>第一次瘦身</b> · 每周只动 L0/L1：删形容词、合并重复、把资料踢去 L2。L2/L3 别动。</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="limits">
+  <h2>适用边界（写给要用它的人）</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3>它成立的前提</h3>
+      <p>① agent 每轮会把一份固定的 system / instructions 文件注入上下文；② 能读写本地文件；③ 检索靠「读索引 + 关键词命中」，不依赖向量库。</p>
+      <p>满足这三条，L0–L3 就直接可用。</p>
+    </div>
+    <div class="card">
+      <h3>它不解决的问题</h3>
+      <p>· <b>语义检索</b>：这是关键词路由，找不到「意思相近但词不同」的记忆，要么补同义词进索引，要么另加检索层。</p>
+      <p>· <b>多人协作</b>：改名会打断链接，多人同时改索引要先约定写入者。</p>
+      <p>· <b>跨设备同步</b>：文件树会漂，得靠版本库或同步盘。</p>
+    </div>
+  </div>
+
+  <div class="note-box" style="margin-top:16px">
+    <b>一句话总结：</b>把「每轮都要在场的东西」压到两三个文件，其余全部做成「能被索引找到的懒加载正文」。
+    预算不是洁癖，是每轮都在付的账单。
+  </div>
+</section>
+
+<div class="foot">
+  本页是纯静态单文件：无外部字体、无脚本依赖、可直接发给别人或打印成 PDF。
+  结构来自一套实际运行半年以上的 agent 记忆库约定，数字是可替换的量级参考，不是标准答案。
+</div>
+
+</main>
+
+<div class="toast" id="toast">已复制</div>
+
+<script>
+(function () {
+  var toast = document.getElementById("toast");
+  var timer = null;
+  function say(msg) {
+    toast.textContent = msg;
+    toast.classList.add("on");
+    clearTimeout(timer);
+    timer = setTimeout(function () { toast.classList.remove("on"); }, 1400);
+  }
+
+  function fallback(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = document.getElementById(btn.dataset.target);
+      if (!pre) return;
+      var text = pre.textContent;
+      var done = function (ok) {
+        btn.classList.add("done");
+        btn.textContent = ok ? "已复制" : "请手动选择";
+        say(ok ? "已复制到剪贴板" : "复制被拒绝，请手动全选复制");
+        setTimeout(function () {
+          btn.classList.remove("done");
+          btn.textContent = "复制";
+        }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback(text)); });
+      } else {
+        done(fallback(text));
+      }
+    });
+  });
+
+  // 锚点高亮
+  var links = Array.prototype.slice.call(document.querySelectorAll(".jump a"));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+  function sync() {
+    var y = window.scrollY + 150;
+    var idx = 0;
+    sections.forEach(function (s, i) { if (s && s.offsetTop <= y) idx = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === idx); });
+  }
+  window.addEventListener("scroll", sync, { passive: true });
+  sync();
+})();
+</script>
+</body>
+</html>

@@ -43,7 +43,10 @@ python memory-budget.py --home examples
 python memory-budget.py --home ~/.agent-home
 ```
 
-脚本只依赖标准库（Python 3.8+），退出码 `0` = 通过，`1` = 有违规，可以直接挂 CI。
+脚本只依赖标准库（Python 3.8+），退出码 `0` = 通过，`1` = 有违规。
+
+想把它挂成 CI 闸门，把 [`ci/github-actions.yml`](ci/github-actions.yml) 复制到你自己仓库的
+`.github/workflows/budget.yml` 即可（推工作流文件需要带 `workflow` 权限的 token）。
 
 ## 校验脚本做什么
 
@@ -101,7 +104,7 @@ L3  469.1 KB               7 个冷档目录 / 101 个文件（不校验预算�
 │       ├── （环境）runtime.md        # L2
 │       ├── （技术）build-issues.md   # L2
 │       └── （技术）build-issues-detail/   # L3
-└── .github/workflows/budget.yml   # CI：每次推送跑一遍闸门
+└── ci/github-actions.yml     # 想开 CI 就把这个文件复制到 .github/workflows/
 ```
 
 ## 适用边界
